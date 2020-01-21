@@ -1,0 +1,229 @@
+/*******************************************************************************
+Boot Code Target:
+	initialize the following registers:
+	ds	some BIOSes set this register to 0, some set it to 0x40.
+	ss & sp	(the stack). The initial values in these registers depend
+		on the BIOS.
+	cs & id (re-initialize these with a far jmp). most BIOSes enter the
+		boot code at address 0000:7C00, but some (like Compaq)jump
+		to 07C0:0000. Because short and conditional jumps are 
+		IP-relative, there is no need to reload CS and IP if your 
+		boot code does not use far or absolute JMPs.
+	process:
+		1. move self to 0x0600
+		2. scan disk to make the os list
+		3. if there's only 1 os, imdiately boot, else wait for choice
+		4. check if the disk support LBA, failed to CHS mode.
+		5. load the selected partition, and check the bootind, if
+		   failed, perror and jmp to step 2
+*******************************************************************************/
+		.text
+		.code16
+		.globl start
+start:
+cursor:
+cur_x = .
+cur_y = .+1
+os_count = .+2
+os_mask = .+3
+str_bx = .+4
+str_cx = .+6
+boot_list = .+8
+DAP = .+9
+DAP_PkgSize = .+9
+DAP_Rsvd = .+10
+DAP_BlkCnt = .+11
+DAP_BufAddr = .+13
+DAP_BlkNum = .+17
+/*	Copy self to 0x0600	*/
+	xorw	%ax,	%ax
+	movw	%ax,	%ds
+	movw	%ax,	%es
+	movw	$0x7C00,%si
+	movw	$0x0600,%di
+	movw	$0x0100,%cx
+	cld
+	rep
+	movsw
+jmp	main-0x7C00+0x0600
+main:
+	movw	%ax,	%ss
+	movw	$0x1000,%sp
+	movb	%dl,	bios_boot
+	movw	$0x020A,cursor
+list_os:
+	movb	$0x00,	os_count
+	movw	$0x07BE,%bx
+	movw	$0x0004,%cx
+	movb	$0x00,	boot_list
+1:
+	cmpb	$0x80,	(%bx)
+	jne	2f
+	incb	os_count
+	movw	$os_str,%bp
+	movb	4(%bx),	%ah
+	pushw	%cx
+	movw	$os_strlen,	%cx
+	.1:
+		cmpb	%ah,	(%bp)
+		jne	.2
+	jmp	.3
+	.2:
+		incw	%bp
+		loop	.1
+	.3:
+		movw	$0x000C,str_bx
+		movw	$0x0005,str_cx
+		incw	%bp
+		pushw	%bp
+		movw	$F_key,	%bp
+		incb	1(%bp)
+		call	puts
+		addb	$0x03,	cur_x
+		popw	%bp
+		call	puts
+		subb	$0x03,	cur_x
+		incb	cur_y
+	popw	%cx
+	movw	$0x01,	%ax
+	shlw	%cl,	%ax
+	addb	%al,	boot_list
+2:
+	addw	$0x10,	%bx
+loop	1b
+chk_conf:
+	cmpb	$0x01,	os_count
+	jb	1f
+	movb	boot_list,	%al
+	shrb	$0x01,	%al
+	andb	boot_os,	%al
+	jz	2f
+	shrb	$0x01,	%al
+	xorb	$0x03,	%al
+	andb	$0x03,	%al
+	movb	%al,	boot_os
+	cmpb	$0x00,	time_out
+	jz	chk_LBA
+	movw	$prompt,	%bp
+	movw	$0x000C,str_bx
+	movw	$0x05,	str_cx
+	call	puts
+	addb	$0x30,	%al
+	movb	$0x0E,	%ah
+	int	$0x10
+jmp	.
+1:
+	movw	$err_no_os,	%bp
+	movw	$0x000C,str_bx
+	movw	$0x05,	str_cx
+	call	puts
+jmp	.
+2:
+	movb	$0xFF,	time_out
+set_timer:
+chk_LBA:
+	testb	$0x80,	bios_boot
+	jz	chs_mode
+	movb	$0x41,	%ah
+	movw	$0x55AA,%bx
+	int	$0x13
+	jc	chs_mode
+	cmpw	$0xAA55,%bx
+	jne	chs_mode
+LBA_mode:
+	movb	$0x42,	%ah
+	movb	bios_boot,	%dl
+	movw	$DAP,	%si
+	movb	$0x10,	DAP_PkgSize
+	movb	$0x00,	DAP_Rsvd
+	movw	$0x01,	DAP_BlkCnt
+	movl	$0x7C00,DAP_BufAddr
+	movl	$0x0002,DAP_BlkNum
+	movl	$0x0000,DAP_BlkNum+4
+	int	$0x13
+	jnc	boot
+chs_mode:
+	movw	$0x0201,%ax
+	movw	$0x0000,%bx
+	movw	$0x0000,%cx
+	movw	$0x0080,%dx
+	int	$0x13
+	jnc	boot
+	xorb	%ah,	%ah
+	int	$0x13
+	jmp	chs_mode
+jmp	.
+
+boot:
+	movw	$0x7C00,%bp
+	cmpw	$0xAA55,(%bp)
+	jne	err_obr
+	jmp	*%bp
+err_obr:
+	movw	$err_obr_msg,	%bp
+	movw	$0x000C,str_bx
+	movw	$0x0007,str_cx
+	movw	$0x0000,cursor
+	call	puts
+	movb	$0x00,	boot_os
+	movb	$0xFF,	time_out
+	movb	$0x30,	F_key+1
+	jmp	list_os
+
+puts:
+	pushw	%ax
+	pushw	%bx
+	pushw	%cx
+	pushw	%dx
+	movw	$0x1301,%ax
+	movw	str_bx,	%bx
+	movw	str_cx,	%cx
+	movw	cursor,	%dx
+	int	$0x10
+	popw	%dx
+	popw	%cx
+	popw	%bx
+	popw	%ax
+ret
+
+os_str:
+	.byte	0xAA
+	.ascii	"Yaosa"
+	.byte	0xA6
+	.ascii	"BSD  "
+	.byte	0x07
+	.ascii	"Wins "
+	.byte	0x83
+	.ascii	"Linux"
+misc_os:
+	.byte	0x00
+	.ascii	"MscOS"
+os_strlen = misc_os - os_str
+F_key:
+	.byte	0x46,	0x30,	0x3A
+prompt:
+	.ascii	"Boot:"
+err_no_os:
+	.ascii	"No OS"
+err_obr_msg:
+	.ascii	"Bad OBR"
+
+
+usr_conf:
+boot_os:
+	.byte	0x08
+time_out:
+	.byte	0x00
+.=446
+PTBL:
+	.byte	0x80,	0x00,	0x00,	0x00,	0xAA,	0x00,	0x00,	0x00
+	.byte	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00
+	.byte	0x00,	0x00,	0x00,	0xA6,	0x00,	0x00,	0x00,	0x00
+	.byte	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00
+	.byte	0x80,	0x00,	0x00,	0x83,	0x00,	0x00,	0x00,	0x00
+	.byte	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00
+	.byte	0x80,	0x00,	0x00,	0x07,	0x00,	0x00,	0x00,	0x00
+	.byte	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00
+bootFlag:
+bios_boot:
+	.word	0xAA55
