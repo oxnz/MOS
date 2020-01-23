@@ -1,0 +1,6 @@
+label: dos
+label-id: 0x2e422648
+device: disk.img
+unit: sectors
+
+disk.img1 : start=        2048, size=      260032, type=aa

@@ -3,6 +3,8 @@
 						.text
 						.code16
 						.globl start
+//#define	debug
+
 #ifndef	BUFFER
 	#define	BUFFER	0x0800
 #endif
@@ -36,6 +38,7 @@ start:
 BS_jmpBoot:
 #define	OFF_BootDirClus	0x00
 	jmp	code
+	nop
 .=0x03
 BPB:
 /*	BPB	BIOS PARAMETER BLOCK	*********************************
@@ -221,7 +224,7 @@ retw
 
 missing_loader:
 /*
- *	if boor directory or loader can't be
+ *	if boot directory or loader can't be
  *	located in the disk, we come here to
  *	warn the user of the error(s) by print
  *	an 'M' to screen and halt

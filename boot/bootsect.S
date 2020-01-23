@@ -217,8 +217,8 @@ CR:
 	.byte	'\n'|0x80
 OS_NAMES:
 .byte	0xAA
-	.ascii	"Yaos"
-	.byte	'a'|0x80
+	.ascii	"Meta"
+	.byte	'X'|0x80
 .byte	0x07
 	.ascii	"Window"
 	.byte	's'|0x80

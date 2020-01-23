@@ -9,8 +9,8 @@ CFLAGS	=	-O -Wall -nostdinc -nostdlib -fno-builtin	\
 		-mno-sse -mno-sse2 -mno-sse3	\
 		-Wcast-align -Wbad-function-cast -Wmissing-declarations	\
 		-Wmissing-prototypes -Wnested-externs	\
-		-Wstrict-prototypes
-LDFLAGS	=	-N -e start -static
+		-Wstrict-prototypes -m32
+LDFLAGS	=	-N -e start -static -melf_i386
 OBJCPFLAGS	=	-S -O binary
 
 ASRCS	=	$(wildcard *.S)
@@ -24,6 +24,8 @@ all: bootsect.bin	\
 	osboot.bin	\
 	loader.bin
 
+dis: osboot.bin
+	objdump -D -b binary -mi386 -Maddr16,data16,intel osboot.bin
 bootsect.elf: bootsect.o
 	$(LD) $(LDFLAGS) -Ttext 0x0600 $< -o $@
 osboot.elf: osboot.o

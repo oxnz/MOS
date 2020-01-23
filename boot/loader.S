@@ -22,7 +22,7 @@
  * 0x8000, after that, things was out of this file could control.
  ****************************************************************************/
 
-//#define	debug
+#define	debug
 
 #ifdef FAT32
 	#define	FILE_NAME_LEN	0x0B
@@ -54,7 +54,7 @@ start:
  *	FAT file system use a 8.3 name space to store file names
  *	so our kernel 'KERNEL00.YOS' became 'KERNEL00YOS'
  */
-KERN_NAME:	.ascii	"KERNEL00YOS"
+KERN_NAME:	.ascii	"KERNEL00MOS"
 #endif
 /*
  *	some constant strings used for echo the user what happens

@@ -43,7 +43,7 @@ BPB:.=0x03
  *	-----------------------------------------------------------------*/
 #define	FILE_NAME_LEN	0x0B
 #define	END_OF_CLUS	0x0FFFFFFF
-	BPB_OEMName:	.ascii	"YOSFAT32"	// 0x03		8
+	BPB_OEMName:	.ascii	"MOSFAT32"	// 0x03		8
 #define	OFF_BytsPerSec	0x0B
 	BPB_BytsPerSec:	.word	0x0200		// 0x0B		2
 #define	OFF_SecPerClus	0x0D
